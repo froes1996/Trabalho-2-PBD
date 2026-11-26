@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h5 class="fw-bold text-white mb-1">
+            <i class="bi bi-journal-check text-info me-2"></i>Trilha de Auditoria Imutável de Contêineres
+        </h5>
+        <p class="text-secondary small mb-0">
+            Registros inseridos automaticamente pelo PostgreSQL a cada mudança de bloco ou status operacional.
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge badge-routine py-2 px-3">TRIGGER trg_auditoria_movimentacao_container</span>
+        <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-arrow-left me-1"></i> Voltar à Operação
+        </a>
+    </div>
+</div>
+
+<div class="card card-navy">
+    <div class="table-responsive">
+        <table class="table table-navy table-hover align-middle mb-0 small">
+            <thead>
+                <tr>
+                    <th class="ps-3">#ID</th>
+                    <th>Data / Hora</th>
+                    <th>Contêiner</th>
+                    <th>Evento Detectado</th>
+                    <th>Transição de Status</th>
+                    <th>Movimentação de Bloco</th>
+                    <th class="pe-3">Observação Automática</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in registros %}
+                {% set type_class = 'badge-reefer' if r.tipo_container == 'REEFER' else ('badge-imo' if r.tipo_container == 'IMO' else 'badge-dry') %}
+                {% set event_style = 'bg-success text-success border-success' if r.evento in ('ENTRADA_PATIO', 'LIBERACAO_INSPECAO')
+                    else ('bg-warning text-warning border-warning' if r.evento == 'ENVIO_INSPECAO'
+                    else ('bg-danger text-danger border-danger' if r.evento == 'SAIDA_TERMINAL'
+                    else 'bg-info text-info border-info')) %}
+                <tr>
+                    <td class="ps-3 font-mono text-secondary">{{ r.id }}</td>
+                    <td class="font-mono text-light">{{ r.registrado_em.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                    <td>
+                        <span class="fw-bold font-mono text-white">{{ r.numero_iso }}</span>
+                        <span class="badge {{ type_class }} ms-1">{{ r.tipo_container }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {{ event_style }} bg-opacity-10 border border-opacity-25 font-mono px-2 py-1">
+                            {{ r.evento }}
+                        </span>
+                    </td>
+                    <td class="font-mono">
+                        <span class="text-secondary">{{ r.status_anterior or '—' }}</span>
+                        <i class="bi bi-arrow-right text-info mx-1"></i>
+                        <strong class="text-white">{{ r.status_novo }}</strong>
+                    </td>
+                    <td class="font-mono">
+                        <span class="text-secondary">{{ r.bloco_anterior or 'GATE' }}</span>
+                        <i class="bi bi-arrow-right text-info mx-1"></i>
+                        <strong class="text-info">{{ r.bloco_novo or 'EXPEDIDO' }}</strong>
+                    </td>
+                    <td class="pe-3 text-secondary">{{ r.observacao }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

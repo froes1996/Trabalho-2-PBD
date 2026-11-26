@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <h5 class="mb-0 fw-bold text-white">
+        <i class="bi bi-grid-3x3-gap-fill text-info me-2"></i>Ocupação dos Blocos do Pátio
+    </h5>
+    <span class="badge badge-routine px-2 py-1">FUNCTION fn_indicadores_ocupacao_patio()</span>
+</div>
+
+<div class="row g-3 mb-4">
+    {% for item in indicadores_patio %}
+    {% set bar_color = 'bg-danger' if item.taxa_ocupacao_pct >= 90 else ('bg-warning' if item.taxa_ocupacao_pct >= 70 else 'bg-info') %}
+    {% set type_class = 'badge-reefer' if item.tipo_suportado == 'REEFER' else ('badge-imo' if item.tipo_suportado == 'IMO' else 'badge-dry') %}
+    <div class="col-md-4">
+        <div class="card card-navy h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <span class="text-secondary small d-block">Setor Armazenagem</span>
+                        <h5 class="card-title mb-0 fw-bold font-mono text-white">{{ item.codigo_bloco }}</h5>
+                    </div>
+                    <span class="badge {{ type_class }} px-2 py-1">{{ item.tipo_suportado }}</span>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <span class="small text-secondary">
+                        Alocados: <strong class="text-white font-mono">{{ item.ocupacao_atual }}/{{ item.capacidade_maxima }}</strong>
+                    </span>
+                    <span class="font-mono fw-semibold text-info">{{ item.taxa_ocupacao_pct }}%</span>
+                </div>
+
+                <div class="progress mb-3" style="height: 7px; background-color: #090f1d;">
+                    <div class="progress-bar {{ bar_color }}" data-width="{{ item.taxa_ocupacao_pct }}"></div>
+                </div>
+
+                <div class="d-flex justify-content-between pt-2 border-top border-secondary border-opacity-25 small">
+                    <span class="text-secondary">Vagas livres: <strong class="text-light font-mono">{{ item.vagas_disponiveis }}</strong></span>
+                    <span class="text-secondary">Permanência: <strong class="text-light font-mono">{{ item.media_dias_patio }}d</strong></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card card-navy h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-truck-front-fill text-info me-2"></i>1. Entrada na Balança Rodoviária</span>
+                <span class="badge badge-routine">TRG PBTC Máx</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('registrar_entrada_balanca') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label small fw-medium">Conjunto Transportador (Cavalo / Carreta / Limite PBTC)</label>
+                        <select name="veiculo_id" class="form-select form-select-sm" required>
+                            {% for v in veiculos %}
+                            <option value="{{ v.id }}">{{ v.placa_cavalo }} / {{ v.placa_carreta }} — PBTC Máx: {{ v.pbtc_maximo_kg }} kg ({{ v.razao_social }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-medium">Contêiner Vinculado</label>
+                        <select name="container_id" class="form-select form-select-sm" required>
+                            {% for c in containers if c.status != 'EXPEDIDO' %}
+                            <option value="{{ c.id }}">{{ c.numero_iso }} ({{ c.tipo }}) — {{ c.status }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-medium">Fluxo Operacional</label>
+                            <select name="tipo_operacao" class="form-select form-select-sm" required>
+                                <option value="DESCARGA">DESCARGA (Gate-In)</option>
+                                <option value="EMBARQUE">EMBARQUE (Gate-Out)</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-medium">Peso Bruto Entrada (kg)</label>
+                            <input type="number" step="0.01" name="peso_entrada_kg" class="form-control form-control-sm font-mono" placeholder="Ex: 38500.00" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary-navy btn-sm w-100 py-2">
+                        <i class="bi bi-check2-circle me-1"></i> Registrar Pesagem de Entrada
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 d-flex flex-column gap-4">
+        <div class="card card-navy">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-arrows-move text-info me-2"></i>2. Alocar / Remanejar no Pátio</span>
+                <span class="badge badge-routine">SP + TRG Auditoria</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('alocar_container') }}" method="POST" class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small fw-medium">Contêiner</label>
+                        <select name="container_id" class="form-select form-select-sm" required>
+                            {% for c in containers if c.status != 'EXPEDIDO' %}
+                            <option value="{{ c.id }}">{{ c.numero_iso }} ({{ c.tipo }}) [{{ c.codigo_bloco or 'GATE' }}]</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small fw-medium">Bloco Destino</label>
+                        <select name="bloco_id" class="form-select form-select-sm" required>
+                            {% for b in blocos %}
+                            <option value="{{ b.id }}">{{ b.codigo_bloco }} ({{ b.tipo_suportado }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success btn-sm w-100">Alocar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card card-navy flex-grow-1">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-plus-square-dotted text-info me-2"></i>3. Pré-Cadastro de Contêiner (Gate)</span>
+                <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25">INSERT</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('cadastrar_container') }}" method="POST" class="row g-2">
+                    <div class="col-5">
+                        <label class="form-label small fw-medium">Número ISO</label>
+                        <input type="text" name="numero_iso" class="form-control form-control-sm font-mono text-uppercase" placeholder="TCLU1234567" required>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label small fw-medium">Tipo</label>
+                        <select name="tipo" class="form-select form-select-sm" required>
+                            <option value="DRY">DRY</option>
+                            <option value="REEFER">REEFER</option>
+                            <option value="IMO">IMO</option>
+                        </select>
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label small fw-medium">Tara (kg)</label>
+                        <input type="number" step="0.01" name="tara_kg" class="form-control form-control-sm font-mono" value="3800" required>
+                    </div>
+                    <div class="col-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-outline-info btn-sm w-100">Criar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-navy mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span class="fw-semibold"><i class="bi bi-speedometer text-info me-2"></i>Ordens de Pesagem (Balança Rodoviária)</span>
+        <div class="d-flex gap-2">
+            <span class="badge badge-routine">FN fn_calcular_peso_liquido()</span>
+            <span class="badge badge-routine">SP sp_finalizar_pesagem_saida()</span>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-navy table-hover align-middle mb-0 small">
+            <thead>
+                <tr>
+                    <th class="ps-3">Protocolo</th>
+                    <th>Veículo / PBTC</th>
+                    <th>Contêiner</th>
+                    <th>Operação</th>
+                    <th>Entrada (kg)</th>
+                    <th>Saída (kg)</th>
+                    <th>Líquido Carga (kg)</th>
+                    <th>Status</th>
+                    <th class="pe-3">Encerrar Pesagem</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in ordens %}
+                {% set type_class = 'badge-reefer' if o.tipo_container == 'REEFER' else ('badge-imo' if o.tipo_container == 'IMO' else 'badge-dry') %}
+                <tr>
+                    <td class="ps-3 fw-semibold font-mono text-white">{{ o.protocolo }}</td>
+                    <td>
+                        <span class="font-mono text-light">{{ o.placa_cavalo }}</span>
+                        <span class="text-secondary d-block" style="font-size: 0.72rem;">Máx: {{ o.pbtc_maximo_kg }} kg</span>
+                    </td>
+                    <td>
+                        <span class="font-mono text-white">{{ o.numero_iso }}</span>
+                        <span class="badge {{ type_class }} ms-1">{{ o.tipo_container }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {{ 'bg-primary bg-opacity-25 text-info' if o.tipo_operacao == 'EMBARQUE' else 'bg-secondary bg-opacity-25 text-light' }}">
+                            {{ o.tipo_operacao }}
+                        </span>
+                    </td>
+                    <td class="font-mono">{{ o.peso_entrada_kg }}</td>
+                    <td class="font-mono">{{ o.peso_saida_kg or '—' }}</td>
+                    <td class="font-mono fw-semibold text-info">
+                        {% if o.peso_liquido_kg is not none %}
+                            {{ o.peso_liquido_kg }}
+                        {% else %}
+                            {{ o.peso_liquido_calculado }} <span class="text-secondary fw-normal">(est.)</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if o.status_ordem == 'ABERTA' %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25">ABERTA</span>
+                        {% else %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">CONCLUÍDA</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-3">
+                        {% if o.status_ordem == 'ABERTA' %}
+                        <form action="{{ url_for('finalizar_pesagem', ordem_id=o.id) }}" method="POST" class="d-flex gap-1">
+                            <input type="number" step="0.01" name="peso_saida_kg" class="form-control form-control-sm font-mono" style="width: 120px;" placeholder="Peso saída" required>
+                            <button type="submit" class="btn btn-sm btn-success">Finalizar</button>
+                        </form>
+                        {% else %}
+                        <span class="text-secondary"><i class="bi bi-lock-fill me-1"></i>Encerrada</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card card-navy">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-boxes text-info me-2"></i>Inventário de Contêineres no Terminal</span>
+        <span class="badge badge-routine">TRG trg_auditoria_movimentacao_container</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-navy table-hover align-middle mb-0 small">
+            <thead>
+                <tr>
+                    <th class="ps-3">Código ISO</th>
+                    <th>Natureza</th>
+                    <th>Tara (kg)</th>
+                    <th>Posição / Bloco</th>
+                    <th>Status Atual</th>
+                    <th class="pe-3">Vistoria / Inspeção</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in containers %}
+                {% set type_class = 'badge-reefer' if c.tipo == 'REEFER' else ('badge-imo' if c.tipo == 'IMO' else 'badge-dry') %}
+                <tr>
+                    <td class="ps-3 fw-bold font-mono text-white">{{ c.numero_iso }}</td>
+                    <td><span class="badge {{ type_class }}">{{ c.tipo }}</span></td>
+                    <td class="font-mono">{{ c.tara_kg }}</td>
+                    <td class="font-mono text-info">{{ c.codigo_bloco or '—' }}</td>
+                    <td>
+                        {% if c.status == 'NO_PATIO' %}
+                            <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-25">NO_PATIO</span>
+                        {% elif c.status == 'EM_INSPECAO' %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25">EM_INSPECAO</span>
+                        {% elif c.status == 'EXPEDIDO' %}
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary">EXPEDIDO</span>
+                        {% else %}
+                            <span class="badge bg-light bg-opacity-10 text-light">{{ c.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-3">
+                        {% if c.status == 'NO_PATIO' %}
+                        <form action="{{ url_for('alternar_inspecao', container_id=c.id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="novo_status" value="EM_INSPECAO">
+                            <button type="submit" class="btn btn-sm btn-outline-warning">
+                                <i class="bi bi-search me-1"></i>Enviar p/ Inspeção
+                            </button>
+                        </form>
+                        {% elif c.status == 'EM_INSPECAO' %}
+                        <form action="{{ url_for('alternar_inspecao', container_id=c.id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="novo_status" value="NO_PATIO">
+                            <button type="submit" class="btn btn-sm btn-outline-info">
+                                <i class="bi bi-check-lg me-1"></i>Liberar Inspeção
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-secondary">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
